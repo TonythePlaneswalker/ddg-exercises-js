@@ -188,8 +188,8 @@ class Geometry {
 	 */
 	angle(c) {
 		let a = this.vector(c.halfedge.prev);
-		let b = this.vector(c.halfedge.next);
-		return Math.acos(-a.unit().dot(b.unit()));
+		let b = this.vector(c.halfedge.next.twin);
+		return Math.acos(a.unit().dot(b.unit()));
 	}
 
 	/**
@@ -228,7 +228,7 @@ class Geometry {
 	barycentricDualArea(v) {
 		let a = 0;
 		for (let f of v.adjacentFaces()) {
-			a = a + this.area(f);
+			a += this.area(f);
 		}
 		return a / 3;
 	}
@@ -241,9 +241,11 @@ class Geometry {
 	 * @returns {number}
 	 */
 	circumcentricDualArea(v) {
-		// TODO
-
-		return 0.0; // placeholder
+		let a = 0;
+		for (let h of v.adjacentHalfedges()) {
+			a += this.vector(h).norm2() * this.cotan(h) + this.vector(h.prev).norm2() * this.cotan(h.prev);
+		}
+		return a / 8;
 	}
 
 	/**
@@ -256,7 +258,7 @@ class Geometry {
 		let n = new Vector();
 		for (let f of v.adjacentFaces()) {
 			let normal = this.faceNormal(f);
-			n.incrementBy(normal * this.angle(v.halfedge.next.corner));
+			n.incrementBy(normal);
 		}
 		n.normalize();
 		return n;
@@ -272,12 +274,10 @@ class Geometry {
 		let n = new Vector();
 		for (let f of v.adjacentFaces()) {
 			let normal = this.faceNormal(f);
-
+			normal.scaleBy(this.area(f));
 			n.incrementBy(normal);
 		}
-
 		n.normalize();
-
 		return n;
 	}
 
@@ -288,9 +288,14 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.Vector}
 	 */
 	vertexNormalAngleWeighted(v) {
-		// TODO
-
-		return new Vector(); // placeholder
+		let n = new Vector();
+		for (let c of v.adjacentCorners()) {
+			let normal = this.faceNormal(c.face);
+			normal.scaleBy(this.angle(c));
+			n.incrementBy(normal);
+		}
+		n.normalize();
+		return n;
 	}
 
 	/**
@@ -300,9 +305,14 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.Vector}
 	 */
 	vertexNormalGaussCurvature(v) {
-		// TODO
-
-		return new Vector(); // placeholder
+		let n = new Vector();
+		for (let h of v.adjacentHalfedges()) {
+			let normal = this.vector(h).unit();
+			normal.scaleBy(this.dihedralAngle(h));
+			n.incrementBy(normal);
+		}
+		n.normalize();
+		return n;
 	}
 
 	/**
@@ -312,9 +322,14 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.Vector}
 	 */
 	vertexNormalMeanCurvature(v) {
-		// TODO
-
-		return new Vector(); // placeholder
+		let n = new Vector();
+		for (let h of v.adjacentHalfedges()) {
+			let normal = this.vector(h);
+			normal.scaleBy(this.cotan(h) + this.cotan(h.twin));
+			n.incrementBy(normal);
+		}
+		n.normalize();
+		return n;
 	}
 
 	/**
@@ -324,9 +339,16 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.Vector}
 	 */
 	vertexNormalSphereInscribed(v) {
-		// TODO
-
-		return new Vector(); // placeholder
+		let n = new Vector();
+		for (let h of v.adjacentHalfedges()) {
+			let a = this.vector(h);
+			let b = this.vector(h.next.next.twin);
+			let normal = a.cross(b);
+			normal.divideBy(a.norm2() * b.norm2())
+			n.incrementBy(normal);
+		}
+		n.normalize();
+		return n;
 	}
 
 	/**
@@ -337,9 +359,11 @@ class Geometry {
 	 * @returns {number}
 	 */
 	angleDefect(v) {
-		// TODO
-
-		return 0.0; // placeholder
+		let K = 2 * Math.PI;
+		for (let c of v.adjacentCorners()) {
+			K -= this.angle(c);
+		}
+		return K;
 	}
 
 	/**
@@ -359,9 +383,11 @@ class Geometry {
 	 * @returns {number}
 	 */
 	scalarMeanCurvature(v) {
-		// TODO
-
-		return 0.0; // placeholder
+		let H = 0;
+		for (let h of v.adjacentHalfedges()) {
+			H += this.dihedralAngle(h) * this.vector(h).norm() / 2;
+		}
+		return H;
 	}
 
 	/**
@@ -370,9 +396,11 @@ class Geometry {
 	 * @returns {number}
 	 */
 	totalAngleDefect() {
-		// TODO
-
-		return 0.0; // placeholder
+		let total_K = 0;
+		for (let v of this.mesh.vertices) {
+			total_K += this.angleDefect(v);
+		}
+		return total_K;
 	}
 
 	/**
@@ -382,9 +410,12 @@ class Geometry {
 	 * @returns {number[]} An array containing the minimum and maximum principal curvature values at a vertex.
 	 */
 	principalCurvatures(v) {
-		// TODO
-
-		return [0.0, 0.0]; // placeholder
+		let H = this.scalarMeanCurvature(v) / this.circumcentricDualArea(v);
+		let K = this.scalarGaussCurvature(v) / this.circumcentricDualArea(v);
+		let k1 = H - Math.sqrt(H * H - K);
+		let k2 = H + Math.sqrt(H * H - K);
+		console.log(H, K, (k1+k2)/2, k1*k2, k1, k2)
+		return [k1, k2];
 	}
 
 	/**

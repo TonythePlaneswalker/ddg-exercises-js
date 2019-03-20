@@ -187,9 +187,9 @@ class Geometry {
 	 * @returns {number} The angle clamped between 0 and π.
 	 */
 	angle(c) {
-		// TODO
-
-		return 0.0; // placeholder
+		let a = this.vector(c.halfedge.prev);
+		let b = this.vector(c.halfedge.next);
+		return Math.acos(-a.unit().dot(b.unit()));
 	}
 
 	/**
@@ -199,9 +199,10 @@ class Geometry {
 	 * @returns {number}
 	 */
 	cotan(h) {
-		// TODO
-
-		return 0.0; // placeholder
+		let a = this.vector(h.prev);
+		let b = this.vector(h.next.twin);
+		let c = a.cross(b);
+		return a.dot(b) / (c.x / c.unit().x);
 	}
 
 	/**
@@ -212,9 +213,10 @@ class Geometry {
 	 * @returns {number} The dihedral angle.
 	 */
 	dihedralAngle(h) {
-		// TODO
-
-		return 0.0; // placeholder
+		let e = this.vector(h);
+		let n1 = this.faceNormal(h.face);
+		let n2 = this.faceNormal(h.twin.face);
+		return Math.atan2(e.unit().dot(n1.cross(n2)), n1.dot(n2));
 	}
 
 	/**
@@ -224,9 +226,11 @@ class Geometry {
 	 * @returns {number}
 	 */
 	barycentricDualArea(v) {
-		// TODO
-
-		return 0.0; // placeholder
+		let a = 0;
+		for (let f of v.adjacentFaces()) {
+			a = a + this.area(f);
+		}
+		return a / 3;
 	}
 
 	/**
@@ -252,12 +256,9 @@ class Geometry {
 		let n = new Vector();
 		for (let f of v.adjacentFaces()) {
 			let normal = this.faceNormal(f);
-
-			n.incrementBy(normal);
+			n.incrementBy(normal * this.angle(v.halfedge.next.corner));
 		}
-
 		n.normalize();
-
 		return n;
 	}
 
@@ -268,9 +269,16 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.Vector}
 	 */
 	vertexNormalAreaWeighted(v) {
-		// TODO
+		let n = new Vector();
+		for (let f of v.adjacentFaces()) {
+			let normal = this.faceNormal(f);
 
-		return new Vector(); // placeholder
+			n.incrementBy(normal);
+		}
+
+		n.normalize();
+
+		return n;
 	}
 
 	/**

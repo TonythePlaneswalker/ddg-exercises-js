@@ -22,9 +22,8 @@ class MeanCurvatureFlow {
 	 * @returns {module:LinearAlgebra.SparseMatrix}
 	 */
 	buildFlowOperator(M, h) {
-		// TODO
-
-		return SparseMatrix.identity(1, 1); // placeholder
+		let L = this.geometry.laplaceMatrix(this.vertexIndex);
+		return M.plus(L.timesReal(h));
 	}
 
 	/**
@@ -33,8 +32,28 @@ class MeanCurvatureFlow {
 	 * @param {number} h The timestep.
 	 */
 	integrate(h) {
-		// TODO
 		let vertices = this.geometry.mesh.vertices;
+		let x = DenseMatrix.zeros(this.geometry.mesh.vertices.length, 1);
+		let y = DenseMatrix.zeros(this.geometry.mesh.vertices.length, 1);
+		let z = DenseMatrix.zeros(this.geometry.mesh.vertices.length, 1);
+		for (let i in this.geometry.positions) {
+			x.set(this.geometry.positions[i].x, this.vertexIndex[i], 0);
+			y.set(this.geometry.positions[i].y, this.vertexIndex[i], 0);
+			z.set(this.geometry.positions[i].z, this.vertexIndex[i], 0);
+		}
+		
+		let M = this.geometry.massMatrix(this.vertexIndex);
+		let A = this.buildFlowOperator(M, h);
+		let llt = A.chol();
+		x = llt.solvePositiveDefinite(M.timesDense(x));
+		y = llt.solvePositiveDefinite(M.timesDense(y));
+		z = llt.solvePositiveDefinite(M.timesDense(z));
+
+		for (let i in this.geometry.positions) {
+			this.geometry.positions[i].x = x.get(this.vertexIndex[i], 0);
+			this.geometry.positions[i].y = y.get(this.vertexIndex[i], 0);
+			this.geometry.positions[i].z = z.get(this.vertexIndex[i], 0);
+		}
 
 		// center mesh positions around origin
 		normalize(this.geometry.positions, vertices, false);

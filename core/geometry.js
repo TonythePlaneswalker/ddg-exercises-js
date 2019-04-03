@@ -427,9 +427,18 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.SparseMatrix}
 	 */
 	laplaceMatrix(vertexIndex) {
-		// TODO
-
-		return SparseMatrix.identity(1, 1); // placeholder
+		let vertices = this.mesh.vertices;
+		let T = new Triplet(vertices.length, vertices.length);
+		for (let i of Object.keys(vertexIndex)) {
+			let total_cotan = 0;
+			for (let h of vertices[i].adjacentHalfedges()) {
+				let cotan = this.cotan(h) + this.cotan(h.twin);
+				T.addEntry(-cotan / 2, vertexIndex[i], vertexIndex[h.next.vertex.index]);
+				total_cotan += cotan;
+			}
+			T.addEntry(total_cotan / 2 + 1e-8, vertexIndex[i], vertexIndex[i]);
+		}
+		return SparseMatrix.fromTriplet(T);
 	}
 
 	/**
@@ -440,9 +449,13 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.SparseMatrix}
 	 */
 	massMatrix(vertexIndex) {
-		// TODO
-
-		return SparseMatrix.identity(1, 1); // placeholder
+		let vertices = this.mesh.vertices;
+		let T = new Triplet(vertices.length, vertices.length);
+		for (let i of Object.keys(vertexIndex)) {
+			T.addEntry(this.barycentricDualArea(vertices[i]),
+				vertexIndex[i], vertexIndex[i]);
+		}
+		return SparseMatrix.fromTriplet(T);
 	}
 
 	/**

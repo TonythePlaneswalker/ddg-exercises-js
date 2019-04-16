@@ -14,9 +14,9 @@ class Solvers {
 	 * @returns {number}
 	 */
 	static residual(A, x) {
-		// TODO
-
-		return 0.0; // placeholder
+		let lambda = x.conjugate().transpose().timesDense(A.timesDense(x)).get(0, 0).overComplex(
+			x.conjugate().transpose().timesDense(x).get(0, 0));
+		return A.timesDense(x).minus(x.timesComplex(lambda)).norm(2) / x.norm(2);
 	}
 
 	/**
@@ -29,9 +29,14 @@ class Solvers {
 	 * smallest eigenvalue λ) of A.
 	 */
 	static solveInversePowerMethod(A) {
-		// TODO
-
-		return ComplexDenseMatrix.zeros(1, 1); // placeholder
+		let x = ComplexDenseMatrix.random(A.nCols(), 1);
+		let llt = A.chol();
+		do {
+			x = llt.solvePositiveDefinite(x);
+			x.decrementBy(ComplexDenseMatrix.constant(x.sum().overReal(x.nRows()), x.nRows(), 1));
+			x.scaleBy(new Complex(1 / x.norm(2), 0));
+		} while (this.residual(A, x) > 1e-10);
+		return x;
 	}
 
 	/**

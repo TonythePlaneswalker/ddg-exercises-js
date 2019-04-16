@@ -21,9 +21,23 @@ class SpectralConformalParameterization {
 	 * @returns {module:LinearAlgebra.ComplexSparseMatrix}
 	 */
 	buildConformalEnergy() {
-		// TODO
+		let ED = this.geometry.complexLaplaceMatrix(this.vertexIndex);
+		ED.scaleBy(new Complex(0.5, 0));
 
-		return ComplexSparseMatrix.identity(1, 1); // placeholder
+		let v = this.geometry.mesh.vertices.length;
+		let T = new ComplexTriplet(v, v);
+		for (let f of this.geometry.mesh.boundaries) {
+			let h = f.halfedge;
+			do {
+				console.log(h.vertex.index, h.twin.vertex.index, h.onBoundary);
+				T.addEntry(new Complex(0, 0.25), h.vertex.index, h.twin.vertex.index);
+				T.addEntry(new Complex(0, -0.25), h.twin.vertex.index, h.vertex.index);
+				h = h.next;
+			} while (h != f.halfedge);
+		}
+		let A = ComplexSparseMatrix.fromTriplet(T);
+
+		return ED.minus(A);
 	}
 
 	/**
@@ -32,9 +46,13 @@ class SpectralConformalParameterization {
 	 * @returns {Object} A dictionary mapping each vertex to a vector of planar coordinates.
 	 */
 	flatten() {
-		// TODO
 		let vertices = this.geometry.mesh.vertices;
-		let flattening = this.geometry.positions; // placeholder
+		let flattening = {};
+		let A = this.buildConformalEnergy();
+		let x = Solvers.solveInversePowerMethod(A);
+		for (let v of vertices) {
+			flattening[v] = new Vector(x.get(v.index, 0).re, x.get(v.index, 0).im, 0);
+		}
 
 		// normalize flattening
 		normalize(flattening, vertices);

@@ -199,6 +199,7 @@ class Geometry {
 	 * @returns {number}
 	 */
 	cotan(h) {
+		if (h.onBoundary) return 0;
 		let a = this.vector(h.prev);
 		let b = this.vector(h.next.twin);
 		let c = a.cross(b);
@@ -467,9 +468,20 @@ class Geometry {
 	 * @returns {module:LinearAlgebra.ComplexSparseMatrix}
 	 */
 	complexLaplaceMatrix(vertexIndex) {
-		// TODO
-
-		return ComplexSparseMatrix.identity(1, 1); // placeholder
+		let vertices = this.mesh.vertices;
+		let T = new ComplexTriplet(vertices.length, vertices.length);
+		for (let i of Object.keys(vertexIndex)) {
+			let total_cotan = 0;
+			for (let h of vertices[i].adjacentHalfedges()) {
+				let cotan = this.cotan(h) + this.cotan(h.twin);
+				T.addEntry(new Complex(-cotan / 2, 0), vertexIndex[i],
+					vertexIndex[h.next.vertex.index]);
+				total_cotan += cotan;
+			}
+			T.addEntry(new Complex(total_cotan / 2 + 1e-8, 0), vertexIndex[i],
+				vertexIndex[i]);
+		}
+		return ComplexSparseMatrix.fromTriplet(T);
 	}
 }
 

@@ -15,9 +15,14 @@ class HeatMethod {
 		this.geometry = geometry;
 		this.vertexIndex = indexElements(geometry.mesh.vertices);
 
-		// TODO: build laplace and flow matrices
-		this.A = SparseMatrix.identity(1, 1); // placeholder
-		this.F = SparseMatrix.identity(1, 1); // placeholder
+		// Build laplace and flow matrices
+		this.A = this.geometry.laplaceMatrix(this.vertexIndex);
+		this.Allt = this.A.chol();
+
+		let M = this.geometry.massMatrix(this.vertexIndex);
+		let h = this.geometry.meanEdgeLength();
+		this.F = M.plus(this.A.timesReal(h * h));
+		this.Fllt = this.F.chol();
 	}
 
 	/**
@@ -29,9 +34,18 @@ class HeatMethod {
 	 * @returns {Object} A dictionary mapping each face of the input mesh to a {@link module:LinearAlgebra.Vector Vector}.
 	 */
 	computeVectorField(u) {
-		// TODO
-
-		return {}; // placeholder
+		let X = {};
+		for (let f of this.geometry.mesh.faces) {
+			let du = new Vector();
+			let n = this.geometry.faceNormal(f);
+			for (let h of f.adjacentHalfedges()) {
+				let i = h.prev.vertex.index;
+				let e = this.geometry.vector(h);
+				du.incrementBy(n.cross(e).times(u.get(i, 0)));
+			}
+			X[f] = du.unit().negated();
+		}
+		return X;
 	}
 
 	/**
@@ -43,9 +57,20 @@ class HeatMethod {
 	 * @returns {module:LinearAlgebra.DenseMatrix}
 	 */
 	computeDivergence(X) {
-		// TODO
-
-		return DenseMatrix.zeros(1, 1); // placeholder
+		let divX = DenseMatrix.zeros(this.geometry.mesh.vertices.length, 1);
+		for (let v of this.geometry.mesh.vertices) {
+			let s = 0;
+			for (let f of v.adjacentFaces()) {
+				let h = f.halfedge;
+				while (h.vertex != v) {
+					h = h.next;
+				}
+				s += (this.geometry.cotan(h)*this.geometry.vector(h).dot(X[f])
+					+ this.geometry.cotan(h.prev)*this.geometry.vector(h.prev.twin).dot(X[f]))
+			}
+			divX.set(s / 2, v.index, 0);
+		}
+		return divX;
 	}
 
 	/**
@@ -73,8 +98,10 @@ class HeatMethod {
 	 * @returns {module:LinearAlgebra.DenseMatrix}
 	 */
 	compute(delta) {
-		// TODO
-		let phi = DenseMatrix.zeros(delta.nRows(), 1); // placeholder
+		let u = this.Fllt.solvePositiveDefinite(delta);
+		let X = this.computeVectorField(u);
+		let divX = this.computeDivergence(X);
+		let phi = this.Allt.solvePositiveDefinite(divX.negated());
 
 		// since φ is unique up to an additive constant, it should
 		// be shifted such that the smallest distance is zero
